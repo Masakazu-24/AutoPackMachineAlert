@@ -11,8 +11,7 @@ import time
 import socket
 import os
 import datetime
-import numpy as np
-
+import threading
 
 ## 生成したTeamsのWebhookURLを変数に格納
 TEAMS_WEB_HOOK_URL = "https://kyoceragp.webhook.office.com/webhookb2/1637c1a5-b0e2-4cb4-a46e-0e22f48d27d0@82cc187e-25d5-45e4-8c34-8434bf6075fe/IncomingWebhook/7be33a3145c9405f9da5e014577b85f4/4c26940d-3caf-4724-8f3a-f28d4cf57f1d"
@@ -23,6 +22,7 @@ log_path = os.path.join(log_directory, log_file_name)
 # 稼働灯確認用マイコンIP/PORT
 ip = '192.168.98.4'
 port = 50000
+socket1 = None
 
 
 #エラー処理
@@ -83,6 +83,7 @@ def send_message(Name,Mail,Message): #Nameはローマ字の頭大文字で名+�
         print('Teams messege canceled')
 
 def M5_connect():
+    global socket1
     server = (ip, port)
     try:
         # M5に接続
@@ -91,72 +92,117 @@ def M5_connect():
         print('Connection Success')
         sv_connect_status.set('M5 接続成功')
     except Exception as e:
-        print('Connection Fail')
+        print('M5 Connection Fail')
         failer(e)
         # Teamsに投稿
         myTeamsMessage = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
         myTeamsMessage.title("Error")
-        myTeamsMessage.text("Connection Fail")
+        myTeamsMessage.text("M5 Connection Fail")
         myTeamsMessage.send()
         sys.exit(1)
 
+def send_receve():
+    global flg_red,flg_yellow,flg_green,socket1
+    while True:
+        print('---send_receve---\n')
+        # サーバにコマンド送信
+        command = 'GET\r'
+        socket1.send(command.encode("UTF-8"))
+        dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # サーバから受信
+        recieve = socket1.recv(4096).decode()
+        recieve = recieve.replace('\r\n','').split(',')
+        # print('recieve:\n',recieve)
+        flg_red = int(recieve[3])
+        flg_yellow = int(recieve[6])
+        flg_green = int(recieve[9])
 
-def toggle_button_color(color):
-    interval = 500
-    global flg_red,flg_green,flg_green
-    print('Red/green/Blue: ',flg_red,flg_yellow,flg_green)
-    #赤色
-    if color == 'red':
+        print('From M5 Red/Yellow/Green: ',flg_red,flg_yellow,flg_green)
+        time.sleep(3)
+
+
+def toggle_button_color():
+    global flg_red,flg_green,flg_green,socket1,sv_combined_name,sv_mail
+    global sv_status_1,sv_status_1_bk,sv_status_2,sv_status_2_bk,flg_status_1,flg_status_2
+    while True:
+        print('---toggle_button_color---\n')
+        # Red
         if flg_red == 0:
             red_button["bg"] = "gray"
-            return
         elif flg_red == 1:
             red_button["bg"] = "red"
-            return
         elif flg_red == 2:
             if red_button["bg"] == "red":
                 red_button["bg"] = "gray"
-                root.after(interval, lambda:toggle_button_color(color))
-                return
             else:
                 red_button["bg"] = "red"
-                root.after(interval, lambda:toggle_button_color(color))
-                return
-    #黄色
-    if color == 'yellow':
+        # Yellow
         if flg_yellow == 0:
             yellow_button["bg"] = "gray"
-            return
         elif flg_yellow == 1:
             yellow_button["bg"] = "yellow"
-            return
         elif flg_yellow == 2:
             if yellow_button["bg"] == "yellow":
                 yellow_button["bg"] = "gray"
-                root.after(interval, lambda:toggle_button_color(color))
-                return
             else:
                 yellow_button["bg"] = "yellow"
-                root.after(interval, lambda:toggle_button_color(color))
-                return
-    #緑色
-    if color == 'green':
+        # Green
         if flg_green == 0:
             green_button["bg"] = "gray"
-            return
         elif flg_green == 1:
             green_button["bg"] = "green"
-            return
         elif flg_green == 2:
             if green_button["bg"] == "green":
                 green_button["bg"] = "gray"
-                root.after(interval, lambda:toggle_button_color(color))
-                return
             else:
                 green_button["bg"] = "green"
-                root.after(interval, lambda:toggle_button_color(color))
-                return
-    
+        # フラグの値を文字列に変換
+        flg_red_str = int(flg_red)
+        flg_yellow_str = int(flg_yellow)
+        flg_green_str = int(flg_green)
+        # ステータスを取得
+        status_1 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                                (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                                (df_status_pattern['flg_green'] == flg_green_str)]['status_1'].values[0])
+
+        status_2 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                                (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                                (df_status_pattern['flg_green'] == flg_green_str)]['status_2'].values[0])
+        sv_status_1.set(status_1)
+        sv_status_2.set(status_2)
+        print('status_1:',status_1)
+        print('status_2:',status_2)
+        if str(sv_status_1.get()) == 'nan':
+            sv_status_1.set('')
+        if str(sv_status_2.get()) == 'nan':
+            sv_status_2.set('')
+        if str(sv_status_1.get()) == str(sv_status_1_bk.get()):
+            flg_status_1 = 0
+        else:
+            flg_status_1 = 1
+            sv_status_1_bk.set(sv_status_1.get())
+        if str(sv_status_2.get()) == str(sv_status_2_bk.get()):
+            flg_status_1 = 0
+        else:
+            flg_status_1 = 1
+            sv_status_2_bk.set(sv_status_2.get())
+        
+        if flg_status_1 == 1 or flg_status_2 == 1:
+            print('flg_status_1:',flg_status_1)
+            print('flg_status_2:',flg_status_2)
+
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                Name = sv_name.get()
+                Mail = sv_combined_name.get()
+                send_message(Name,Mail,Message)
+        time.sleep(1)
 
 def focus_out_format(event):
     global sv_name
@@ -217,182 +263,6 @@ def clear_all():
     sv_family_name.set('')
     txt_mail_account.delete(0,'end')
 
-
-def switch_mode(color):
-    global flg_red
-    global flg_yellow
-    global flg_green
-    global sv_combined_name
-    global sv_mail
-    global sv_status_1
-    global sv_status_2
-    
-    Name = sv_combined_name.get()
-    Mail = sv_mail.get()
-    print('--switch_mode--')
-    print('Red/Yellow/Green: ',flg_red,flg_yellow,flg_green)
-    if color == 'red':
-        if flg_red == 0:
-            toggle_button_red["text"] = "点灯"
-            flg_red = 1
-            status_check()
-            toggle_button_color('red')
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-        elif flg_red == 1:
-            toggle_button_red["text"] = "点滅"
-            flg_red = 2
-            status_check()
-            toggle_button_color('red')    
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-        elif flg_red == 2:
-            toggle_button_red["text"] = "消灯"
-            flg_red = 0
-            status_check()
-            toggle_button_color('red')
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-    if color == 'yellow':
-        if flg_yellow == 0:
-            toggle_button_yellow["text"] = "点灯"
-            flg_yellow = 1
-            status_check()
-            toggle_button_color('yellow')
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-        elif flg_yellow == 1:
-            toggle_button_yellow["text"] = "点滅"
-            flg_yellow = 2
-            status_check()
-            toggle_button_color('yellow')    
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-        elif flg_yellow == 2:
-            toggle_button_yellow["text"] = "消灯"
-            flg_yellow = 0
-            status_check()
-            toggle_button_color('yellow')
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-    if color == 'green':
-        if flg_green == 0:
-            toggle_button_green["text"] = "点灯"
-            flg_green = 1
-            status_check()
-            toggle_button_color('green')
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-        elif flg_green == 1:
-            toggle_button_green["text"] = "点滅"
-            flg_green = 2
-            status_check()
-            toggle_button_color('green')    
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-        elif flg_green == 2:
-            toggle_button_green["text"] = "消灯"
-            flg_green = 0
-            status_check()
-            toggle_button_color('green')
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
-                if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                send_message(Name,Mail,Message)
-            return
-
-def status_check():
-    global flg_red,flg_yellow,flg_green,sv_status_1,sv_status_2
-    df_status_pattern = pd.read_csv('Status_pattern.csv',encoding='utf-8')
-    # フラグの値を文字列に変換
-    flg_red_str = int(flg_red)
-    flg_yellow_str = int(flg_yellow)
-    flg_green_str = int(flg_green)
-    # ステータスを取得
-    status_1 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
-                             (df_status_pattern['flg_yellow'] == flg_yellow_str) &
-                             (df_status_pattern['flg_green'] == flg_green_str)]['status_1'].values[0])
-
-    status_2 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
-                             (df_status_pattern['flg_yellow'] == flg_yellow_str) &
-                             (df_status_pattern['flg_green'] == flg_green_str)]['status_2'].values[0])
-    sv_status_1.set(status_1)
-    sv_status_2.set(status_2)
-    if str(sv_status_1.get()) == 'nan':
-        sv_status_1.set('')
-    if str(sv_status_2.get()) == 'nan':
-        sv_status_2.set('')
-
-
 #常に最前面に表示
 root = tk.Tk()
 root.geometry("1280x800+0+0")
@@ -420,8 +290,11 @@ buzzer_2 = 0
 # マシン状態
 sv_status_1 = tk.StringVar() #手動中/原点復帰中/自動運転中/自動停止中
 sv_status_2 = tk.StringVar() #異常中/異常解除待/不足‐満杯
-
-
+sv_status_1_bk = tk.StringVar() #変化確認
+sv_status_2_bk = tk.StringVar() #変化確認
+flg_status_1 = 0 #変化確認
+flg_status_2 = 0 #変化確認
+df_status_pattern = pd.read_csv('Status_pattern.csv',encoding='utf-8')
 # ----------------------------------------------------------------
 
 
@@ -462,13 +335,17 @@ yellow_button.place(x=20, y=240)
 green_button = tk.Button(frame_status, text="G", bg="gray",width=20, height=10)
 green_button.place(x=20, y=400)
 
-toggle_button_red = tk.Button(frame_status, text="R", command=lambda: switch_mode('red'))
-toggle_button_red.place(x=200, y=80)
-toggle_button_yellow = tk.Button(frame_status, text="Y", command=lambda: switch_mode('yellow'))
-toggle_button_yellow.place(x=200, y=240)
-toggle_button_green = tk.Button(frame_status, text="G", command=lambda: switch_mode('green'))
-toggle_button_green.place(x=200, y=400)
+# toggle_button_red = tk.Button(frame_status, text="監視スタート", command=toggle_button_color)
+# toggle_button_red.place(x=200, y=80)
 
+M5_connect()
+# スレッドを作成し、送受信とボタンの色変更を並列で実行
+send_receive_thread = threading.Thread(target=send_receve)
+color_change_thread = threading.Thread(target=toggle_button_color)
+
+# スレッドを開始
+send_receive_thread.start()
+color_change_thread.start()
 
 
 root.mainloop()
