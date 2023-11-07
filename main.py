@@ -11,6 +11,7 @@ import time
 import socket
 import os
 import datetime
+import numpy as np
 
 
 ## 生成したTeamsのWebhookURLを変数に格納
@@ -44,38 +45,42 @@ def failer(e):
         f.write("\n"+str(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")) + "  (line" + str(lineno) + "):" + str(e.args) )
 
 def send_message(Name,Mail,Message): #Nameはローマ字の頭大文字で名+姓の順　間半角スペース'Masakazu Nishi'の形式
-    teams_message = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
-    teams_message.payload = {
-        "type": "message",
-        "attachments": [
-            {
-            "contentType": "application/vnd.microsoft.card.adaptive",
-            "content": {
-                "type": "AdaptiveCard",
-                "body": [
-                    {
-                        "type": "TextBlock",
-                        "text": "<at>"+str(Name)+"</at>\r \n"+str(Message)
-                    }
-                ],
-                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                "version": "1.0",
-                "msteams": {
-                    "entities": [
+    global sv_name,sv_mail
+    if sv_name.get() and sv_mail.get():
+        teams_message = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
+        teams_message.payload = {
+            "type": "message",
+            "attachments": [
+                {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                    "type": "AdaptiveCard",
+                    "body": [
                         {
-                            "type": "mention",
-                            "text": "<at>"+ str(Name)+ "</at>",
-                            "mentioned": {
-                                "id": str(Mail),
-                                "name": str(Name)
-                            }
+                            "type": "TextBlock",
+                            "text": "<at>"+str(Name)+"</at>\r \n"+str(Message)
                         }
-                    ]
+                    ],
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "version": "1.0",
+                    "msteams": {
+                        "entities": [
+                            {
+                                "type": "mention",
+                                "text": "<at>"+ str(Name)+ "</at>",
+                                "mentioned": {
+                                    "id": str(Mail),
+                                    "name": str(Name)
+                                }
+                            }
+                        ]
+                    }
                 }
-            }
-        }]
-    }
-    teams_message.send()
+            }]
+        }
+        teams_message.send()
+    else:
+        print('Teams messege canceled')
 
 def M5_connect():
     server = (ip, port)
@@ -219,6 +224,8 @@ def switch_mode(color):
     global flg_green
     global sv_combined_name
     global sv_mail
+    global sv_status_1
+    global sv_status_2
     
     Name = sv_combined_name.get()
     Mail = sv_mail.get()
@@ -228,106 +235,163 @@ def switch_mode(color):
         if flg_red == 0:
             toggle_button_red["text"] = "点灯"
             flg_red = 1
+            status_check()
             toggle_button_color('red')
-            Message = '赤色点灯'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
         elif flg_red == 1:
             toggle_button_red["text"] = "点滅"
             flg_red = 2
+            status_check()
             toggle_button_color('red')    
-            Message = '赤色点滅'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
         elif flg_red == 2:
             toggle_button_red["text"] = "消灯"
             flg_red = 0
+            status_check()
             toggle_button_color('red')
-            Message = '赤色消灯'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
     if color == 'yellow':
         if flg_yellow == 0:
             toggle_button_yellow["text"] = "点灯"
             flg_yellow = 1
+            status_check()
             toggle_button_color('yellow')
-            Message = '黄色点灯'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
         elif flg_yellow == 1:
             toggle_button_yellow["text"] = "点滅"
             flg_yellow = 2
+            status_check()
             toggle_button_color('yellow')    
-            Message = '黄色点滅'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
         elif flg_yellow == 2:
             toggle_button_yellow["text"] = "消灯"
             flg_yellow = 0
+            status_check()
             toggle_button_color('yellow')
-            Message = '黄色消灯'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
     if color == 'green':
         if flg_green == 0:
             toggle_button_green["text"] = "点灯"
             flg_green = 1
+            status_check()
             toggle_button_color('green')
-            Message = '緑色点灯'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
         elif flg_green == 1:
             toggle_button_green["text"] = "点滅"
             flg_green = 2
+            status_check()
             toggle_button_color('green')    
-            Message = '緑色点滅'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
         elif flg_green == 2:
             toggle_button_green["text"] = "消灯"
             flg_green = 0
+            status_check()
             toggle_button_color('green')
-            Message = '緑色消灯'
-            # send_message(Name,Mail,Message)
-            status_check(color)
+            Message = ''
+            if sv_status_1.get():
+                Message += str(sv_status_1.get())
+            if sv_status_2.get():
+                if sv_status_1.get():
+                    Message += ' & '
+                Message += str(sv_status_2.get())
+            if len(Message) > 0:
+                send_message(Name,Mail,Message)
             return
 
-def status_check(color):
+def status_check():
     global flg_red,flg_yellow,flg_green,sv_status_1,sv_status_2
-    ## sv_status_1
-    if color == 'yellow':
-        if flg_yellow == 1:
-            sv_status_1.set('手動中')
-        elif flg_yellow == 2 and flg_green == 0:
-            sv_status_1.set('原点復帰中')
-        if flg_green == 1 and flg_yellow == 2:
-            sv_status_1.set('')
-            sv_status_2.set('不足/満杯')    
-        if flg_yellow == 0:
-            sv_status_1.set('')
-    elif color == 'green':
-        if flg_green == 1:
-            sv_status_1.set('自動運転中')
-        elif flg_green == 2:
-            sv_status_1.set('自動停止中')
-        if flg_green == 0:
-            sv_status_1.set('')
-    elif color == 'red':
-        ## sv_status_2
-        if flg_red == 1:
-            sv_status_2.set('異常')
-        elif flg_red == 2:
-            sv_status_2.set('異常解除待')
-        if flg_red == 0:
-            sv_status_2.set('')
+    df_status_pattern = pd.read_csv('Status_pattern.csv',encoding='utf-8')
+    # フラグの値を文字列に変換
+    flg_red_str = int(flg_red)
+    flg_yellow_str = int(flg_yellow)
+    flg_green_str = int(flg_green)
+    # ステータスを取得
+    status_1 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                             (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                             (df_status_pattern['flg_green'] == flg_green_str)]['status_1'].values[0])
+
+    status_2 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                             (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                             (df_status_pattern['flg_green'] == flg_green_str)]['status_2'].values[0])
+    sv_status_1.set(status_1)
+    sv_status_2.set(status_2)
+    if str(sv_status_1.get()) == 'nan':
+        sv_status_1.set('')
+    if str(sv_status_2.get()) == 'nan':
+        sv_status_2.set('')
+
 
 #常に最前面に表示
 root = tk.Tk()
