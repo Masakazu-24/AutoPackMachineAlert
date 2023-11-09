@@ -11,8 +11,10 @@ import datetime
 import threading
 
 ## 生成したTeamsのWebhookURLを変数に格納
-TEAMS_WEB_HOOK_URL = "https://kyoceragp.webhook.office.com/webhookb2/1637c1a5-b0e2-4cb4-a46e-0e22f48d27d0@82cc187e-25d5-45e4-8c34-8434bf6075fe/IncomingWebhook/7be33a3145c9405f9da5e014577b85f4/4c26940d-3caf-4724-8f3a-f28d4cf57f1d"
-
+# 西テスト用
+# TEAMS_WEB_HOOK_URL = "https://kyoceragp.webhook.office.com/webhookb2/1637c1a5-b0e2-4cb4-a46e-0e22f48d27d0@82cc187e-25d5-45e4-8c34-8434bf6075fe/IncomingWebhook/7be33a3145c9405f9da5e014577b85f4/4c26940d-3caf-4724-8f3a-f28d4cf57f1d"
+# 本番用
+TEAMS_WEB_HOOK_URL = "https://kyoceragp.webhook.office.com/webhookb2/9ec90966-965d-483a-85a1-eb37475e942a@82cc187e-25d5-45e4-8c34-8434bf6075fe/IncomingWebhook/3aafa31a7d844978acde270e561dedb1/4c26940d-3caf-4724-8f3a-f28d4cf57f1d"
 log_directory = "./log/"
 log_file_name = time.strftime("%Y%m%d", time.localtime()) + "_log.txt"
 log_path = os.path.join(log_directory, log_file_name)
