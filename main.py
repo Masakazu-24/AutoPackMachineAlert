@@ -1,10 +1,7 @@
 # %%
 import tkinter as tk
-from tkinter import ttk
-import tkinter.font as font
 import tkinter.messagebox as tkm
 import pandas as pd
-from pathlib import Path
 import pymsteams
 import sys
 import time
@@ -43,6 +40,7 @@ def failer(e):
     #ログ出力
     with open(log_path,"a",encoding="utf-8") as f:
         f.write("\n"+str(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")) + "  (line" + str(lineno) + "):" + str(e.args) )
+    sys.exit()
 
 def send_message(Name,Mail,Message): #Nameはローマ字の頭大文字で名+姓の順　間半角スペース'Masakazu Nishi'の形式
     global sv_name,sv_mail
@@ -91,8 +89,13 @@ def M5_connect():
         socket1.connect(server)
         print('Connection Success')
         sv_connect_status.set('M5 接続成功')
+    except ConnectionRefusedError as e:
+        print('ConnectionRefusedError')
+        tkm.showerror('ConnectionRefusedError','M5接続失敗')
+        failer(e)
     except Exception as e:
         print('M5 Connection Fail')
+        tkm.showerror('Error','M5接続失敗')
         failer(e)
         # Teamsに投稿
         myTeamsMessage = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
@@ -101,9 +104,9 @@ def M5_connect():
         myTeamsMessage.send()
         sys.exit(1)
 
-def send_receve():
+def send_receve(exit_signal):
     global flg_red,flg_yellow,flg_green,socket1
-    while True:
+    while not exit_signal.is_set():
         print('---send_receve---\n')
         # サーバにコマンド送信
         command = 'GET\r'
@@ -118,90 +121,93 @@ def send_receve():
         flg_green = int(recieve[9])
 
         print('From M5 Red/Yellow/Green: ',flg_red,flg_yellow,flg_green)
-        time.sleep(3)
+        time.sleep(10)
 
 
-def toggle_button_color():
+def toggle_button_color(exit_signal):
     global flg_red,flg_green,flg_green,socket1,sv_combined_name,sv_mail
     global sv_status_1,sv_status_1_bk,sv_status_2,sv_status_2_bk,flg_status_1,flg_status_2
-    while True:
-        print('---toggle_button_color---\n')
-        # Red
-        if flg_red == 0:
-            red_button["bg"] = "gray"
-        elif flg_red == 1:
-            red_button["bg"] = "red"
-        elif flg_red == 2:
-            if red_button["bg"] == "red":
+    while not exit_signal.is_set():
+        try:
+            print('---toggle_button_color---\n')
+            # Red
+            if flg_red == 0:
                 red_button["bg"] = "gray"
-            else:
+            elif flg_red == 1:
                 red_button["bg"] = "red"
-        # Yellow
-        if flg_yellow == 0:
-            yellow_button["bg"] = "gray"
-        elif flg_yellow == 1:
-            yellow_button["bg"] = "yellow"
-        elif flg_yellow == 2:
-            if yellow_button["bg"] == "yellow":
+            elif flg_red == 2:
+                if red_button["bg"] == "red":
+                    red_button["bg"] = "gray"
+                else:
+                    red_button["bg"] = "red"
+            # Yellow
+            if flg_yellow == 0:
                 yellow_button["bg"] = "gray"
-            else:
+            elif flg_yellow == 1:
                 yellow_button["bg"] = "yellow"
-        # Green
-        if flg_green == 0:
-            green_button["bg"] = "gray"
-        elif flg_green == 1:
-            green_button["bg"] = "green"
-        elif flg_green == 2:
-            if green_button["bg"] == "green":
+            elif flg_yellow == 2:
+                if yellow_button["bg"] == "yellow":
+                    yellow_button["bg"] = "gray"
+                else:
+                    yellow_button["bg"] = "yellow"
+            # Green
+            if flg_green == 0:
                 green_button["bg"] = "gray"
-            else:
+            elif flg_green == 1:
                 green_button["bg"] = "green"
-        # フラグの値を文字列に変換
-        flg_red_str = int(flg_red)
-        flg_yellow_str = int(flg_yellow)
-        flg_green_str = int(flg_green)
-        # ステータスを取得
-        status_1 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
-                                (df_status_pattern['flg_yellow'] == flg_yellow_str) &
-                                (df_status_pattern['flg_green'] == flg_green_str)]['status_1'].values[0])
+            elif flg_green == 2:
+                if green_button["bg"] == "green":
+                    green_button["bg"] = "gray"
+                else:
+                    green_button["bg"] = "green"
+            # フラグの値を文字列に変換
+            flg_red_str = int(flg_red)
+            flg_yellow_str = int(flg_yellow)
+            flg_green_str = int(flg_green)
+            # ステータスを取得
+            status_1 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                                    (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                                    (df_status_pattern['flg_green'] == flg_green_str)]['status_1'].values[0])
 
-        status_2 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
-                                (df_status_pattern['flg_yellow'] == flg_yellow_str) &
-                                (df_status_pattern['flg_green'] == flg_green_str)]['status_2'].values[0])
-        sv_status_1.set(status_1)
-        sv_status_2.set(status_2)
-        print('status_1:',status_1)
-        print('status_2:',status_2)
-        if str(sv_status_1.get()) == 'nan':
-            sv_status_1.set('')
-        if str(sv_status_2.get()) == 'nan':
-            sv_status_2.set('')
-        if str(sv_status_1.get()) == str(sv_status_1_bk.get()):
-            flg_status_1 = 0
-        else:
-            flg_status_1 = 1
-            sv_status_1_bk.set(sv_status_1.get())
-        if str(sv_status_2.get()) == str(sv_status_2_bk.get()):
-            flg_status_1 = 0
-        else:
-            flg_status_1 = 1
-            sv_status_2_bk.set(sv_status_2.get())
-        
-        if flg_status_1 == 1 or flg_status_2 == 1:
-            print('flg_status_1:',flg_status_1)
-            print('flg_status_2:',flg_status_2)
+            status_2 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                                    (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                                    (df_status_pattern['flg_green'] == flg_green_str)]['status_2'].values[0])
+            sv_status_1.set(status_1)
+            sv_status_2.set(status_2)
+            print('status_1:',status_1)
+            print('status_2:',status_2)
+            if str(sv_status_1.get()) == 'nan':
+                sv_status_1.set('')
+            if str(sv_status_2.get()) == 'nan':
+                sv_status_2.set('')
+            if str(sv_status_1.get()) == str(sv_status_1_bk.get()):
+                flg_status_1 = 0
+            else:
+                flg_status_1 = 1
+                sv_status_1_bk.set(sv_status_1.get())
+            if str(sv_status_2.get()) == str(sv_status_2_bk.get()):
+                flg_status_2 = 0
+            else:
+                flg_status_2 = 1
+                sv_status_2_bk.set(sv_status_2.get())
+            
+            if flg_status_1 == 1 or flg_status_2 == 1:
+                print('flg_status_1:',flg_status_1)
+                print('flg_status_2:',flg_status_2)
 
-            Message = ''
-            if sv_status_1.get():
-                Message += str(sv_status_1.get())
-            if sv_status_2.get():
+                Message = ''
                 if sv_status_1.get():
-                    Message += ' & '
-                Message += str(sv_status_2.get())
-            if len(Message) > 0:
-                Name = sv_name.get()
-                Mail = sv_combined_name.get()
-                send_message(Name,Mail,Message)
+                    Message += str(sv_status_1.get())
+                if sv_status_2.get():
+                    if sv_status_1.get():
+                        Message += ' & '
+                    Message += str(sv_status_2.get())
+                if len(Message) > 0:
+                    Name = sv_combined_name.get()
+                    Mail = sv_mail.get()
+                    send_message(Name,Mail,Message)
+        except Exception as e:
+            failer(e)
         time.sleep(1)
 
 def focus_out_format(event):
@@ -262,6 +268,25 @@ def clear_all():
     sv_name.set('')
     sv_family_name.set('')
     txt_mail_account.delete(0,'end')
+  
+exit_signal = threading.Event()
+def close_window():
+    print('---close_window---\n')
+    sub_win = tk.Toplevel()
+    sub_win.geometry('100x100')
+    sub_win.attributes("-topmost",True)
+    label = tk.Label(sub_win, text="停止中です・・・")
+    label.place(x=10,y=10)
+    sub_win.update()
+    exit_signal.set() #並列処理停止フラグ
+    socket1.close() #M5接続解除
+    send_receive_thread.join()
+    print('send_recieve joined')
+    sub_win.destroy()
+    color_change_thread.join()
+    print('color_change joined')
+    root.destroy()
+    root.quit()
 
 #常に最前面に表示
 root = tk.Tk()
@@ -335,19 +360,17 @@ yellow_button.place(x=20, y=240)
 green_button = tk.Button(frame_status, text="G", bg="gray",width=20, height=10)
 green_button.place(x=20, y=400)
 
-# toggle_button_red = tk.Button(frame_status, text="監視スタート", command=toggle_button_color)
-# toggle_button_red.place(x=200, y=80)
-
 M5_connect()
 # スレッドを作成し、送受信とボタンの色変更を並列で実行
-send_receive_thread = threading.Thread(target=send_receve)
-color_change_thread = threading.Thread(target=toggle_button_color)
+send_receive_thread = threading.Thread(target=send_receve,args=(exit_signal,))
+color_change_thread = threading.Thread(target=toggle_button_color,args=(exit_signal,))
 
 # スレッドを開始
 send_receive_thread.start()
 color_change_thread.start()
 
-
+# ウィンドウを閉じるイベントの設定
+root.protocol("WM_DELETE_WINDOW", close_window)
 root.mainloop()
 
 
