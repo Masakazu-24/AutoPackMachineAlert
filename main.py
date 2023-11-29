@@ -10,6 +10,7 @@ import socket
 import os
 import datetime
 import threading
+import subprocess
 
 ## 生成したTeamsのWebhookURLを変数に格納
 # 西テスト用
@@ -23,6 +24,8 @@ log_path = os.path.join(log_directory, log_file_name)
 ip = '192.168.98.4'
 port = 50000
 socket1 = None
+# Wi-Fi接続用batファイル
+bat_file_path = r'wifi_connect.bat'
 
 
 #エラー処理
@@ -86,6 +89,7 @@ def send_message(Name,Mail,Message): #Nameはローマ字の頭大文字で名+�
 def M5_connect():
     global socket1
     server = (ip, port)
+    max_retries = 10
     try:
         # M5に接続
         socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -98,34 +102,61 @@ def M5_connect():
         failer(e)
     except Exception as e:
         print('M5 Connection Fail')
-        tkm.showerror('Error','M5接続失敗\n\n稼働灯監視用マイコンへの接続に失敗しました。\n以下の設定を確認してください：\n\n1.Wi-Fi接続設定を開き、Wi-Fi 2がAutoPackingMachineに接続されていることを確認してください。接続されていない場合は接続し、再度プログラムを立ち上げてください。\n\n2.ブラウザを開き、192.168.98.4にアクセスします。アクセスができない場合はマイコンの再起動を行います。稼働灯下にある本体のディスプレイとサイドボタンを長押しし、画面が一度消えて再度表示されたことを確認したら、1のWi-Fi接続を確認後に再度プログラムを立ち上げてください。')
-        # Teamsに投稿
-        myTeamsMessage = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
-        myTeamsMessage.title("Error")
-        myTeamsMessage.text("M5 Connection Fail")
-        myTeamsMessage.send()
-        failer(e)
-        sys.exit(1)
+        result = subprocess.run([bat_file_path],capture_output=True,text=True)
+        print(f"標準出力：\n{result.stdout}")
+        print(f"標準エラー：\n{result.stderr}")
+        print(f"終了コード：\n{result.returncode}")
+        for _ in range(max_retries):
+            with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:
+                result = s.connect_ex((ip,port))
+                if result == 0:
+                    print('Connection successfully!!')
+                    break
+                else:
+                    print('Connection failed. Retrying...')
+                    time.sleep(1)
+        else:
+            print('Exceeded maximum retries. Connection failed')
+        try:
+            # M5に接続
+            socket1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            socket1.connect(server)
+            print('Connection Success at 2nd try')
+            sv_connect_status.set('M5 接続成功')
+        except Exception as e:
+            tkm.showerror('Error','M5接続失敗\n\n稼働灯監視用マイコンへの接続に失敗しました。\n以下の設定を確認してください：\n\n1.Wi-Fi接続設定を開き、Wi-Fi 2がAutoPackingMachineに接続されていることを確認してください。接続されていない場合は接続し、再度プログラムを立ち上げてください。\n\n2.ブラウザを開き、192.168.98.4にアクセスします。アクセスができない場合はマイコンの再起動を行います。稼働灯下にある本体のディスプレイとサイドボタンを長押しし、画面が一度消えて再度表示されたことを確認したら、1のWi-Fi接続を確認後に再度プログラムを立ち上げてください。')
+            # Teamsに投稿
+            myTeamsMessage = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
+            myTeamsMessage.title("Error")
+            myTeamsMessage.text("M5 Connection Fail")
+            myTeamsMessage.send()
+            failer(e)
+            sys.exit(1)
 
 def send_receve(exit_signal):
     global flg_red,flg_yellow,flg_green,socket1,sv_connect_status
     if sv_connect_status.get() == 'M5 接続成功':
         while not exit_signal.is_set():
-            print('---send_receve---\n')
-            # サーバにコマンド送信
-            command = 'GET\r'
-            socket1.send(command.encode("UTF-8"))
-            dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            # サーバから受信
-            recieve = socket1.recv(4096).decode()
-            recieve = recieve.replace('\r\n','').split(',')
-            # print('recieve:\n',recieve)
-            flg_red = int(recieve[3])
-            flg_yellow = int(recieve[6])
-            flg_green = int(recieve[9])
+            try:
+                print('---send_receve---\n')
+                # サーバにコマンド送信
+                command = 'GET\r'
+                socket1.send(command.encode("UTF-8"))
+                dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # サーバから受信
+                recieve = socket1.recv(4096).decode()
+                recieve = recieve.replace('\r\n','').split(',')
+                # print('recieve:\n',recieve)
+                flg_red = int(recieve[3])
+                flg_yellow = int(recieve[6])
+                flg_green = int(recieve[9])
 
-            print('From M5 Red/Yellow/Green: ',flg_red,flg_yellow,flg_green)
-            time.sleep(10)
+                print('From M5 Red/Yellow/Green: ',flg_red,flg_yellow,flg_green)
+                time.sleep(10)
+            except ConnectionAbortedError:
+                print('ConnectionAbortedError')
+            except Exception as e:
+                failer(e)
     else:
         print('Cannot send to M5\n')
 
