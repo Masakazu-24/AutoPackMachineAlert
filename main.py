@@ -98,13 +98,13 @@ def M5_connect():
         failer(e)
     except Exception as e:
         print('M5 Connection Fail')
-        tkm.showerror('Error','M5接続失敗')
-        failer(e)
+        tkm.showerror('Error','M5接続失敗\n\n稼働灯監視用マイコンへの接続に失敗しました。\n以下の設定を確認してください：\n\n1.Wi-Fi接続設定を開き、Wi-Fi 2がAutoPackingMachineに接続されていることを確認してください。接続されていない場合は接続し、再度プログラムを立ち上げてください。\n\n2.ブラウザを開き、192.168.98.4にアクセスします。アクセスができない場合はマイコンの再起動を行います。稼働灯下にある本体のディスプレイとサイドボタンを長押しし、画面が一度消えて再度表示されたことを確認したら、1のWi-Fi接続を確認後に再度プログラムを立ち上げてください。')
         # Teamsに投稿
         myTeamsMessage = pymsteams.connectorcard(TEAMS_WEB_HOOK_URL)
         myTeamsMessage.title("Error")
         myTeamsMessage.text("M5 Connection Fail")
         myTeamsMessage.send()
+        failer(e)
         sys.exit(1)
 
 def send_receve(exit_signal):
@@ -179,6 +179,9 @@ def toggle_button_color(exit_signal):
                 status_2 = str(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
                                         (df_status_pattern['flg_yellow'] == flg_yellow_str) &
                                         (df_status_pattern['flg_green'] == flg_green_str)]['status_2'].values[0])
+                alert_status = int(df_status_pattern[(df_status_pattern['flg_red'] == flg_red_str) &
+                                        (df_status_pattern['flg_yellow'] == flg_yellow_str) &
+                                        (df_status_pattern['flg_green'] == flg_green_str)]['alert_flg'].values[0])
                 sv_status_1.set(status_1)
                 sv_status_2.set(status_2)
                 print('status_1:',status_1)
@@ -209,7 +212,7 @@ def toggle_button_color(exit_signal):
                         if sv_status_1.get():
                             Message += ' & '
                         Message += str(sv_status_2.get())
-                    if len(Message) > 0:
+                    if len(Message) > 0 and alert_status ==1:
                         Name = sv_combined_name.get()
                         Mail = sv_mail.get()
                         send_message(Name,Mail,Message)
@@ -417,7 +420,7 @@ yellow_button.place(x=20, y=240)
 green_button = tk.Button(frame_status, text="G", bg="gray",width=20, height=10)
 green_button.place(x=20, y=400)
 
-# M5_connect()
+M5_connect()
 # スレッドを作成し、送受信とボタンの色変更を並列で実行
 send_receive_thread = threading.Thread(target=send_receve,args=(exit_signal,))
 color_change_thread = threading.Thread(target=toggle_button_color,args=(exit_signal,))
